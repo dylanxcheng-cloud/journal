@@ -43,12 +43,62 @@ events, and a Notes-style paper card and checklists for the journal and habits.
 - The wallpaper is an image you set yourself; web pages can't change a phone's wallpaper.
 - The widget is a page, not a system widget.
 
-## From website to app
+## iOS app with home-screen and lock-screen widgets
 
-Keep the same code and data. Wrap it with Capacitor to get what the browser can't give:
-OS-scheduled notifications that fire when the app is closed, automatic wallpaper on Android, and
-real home-screen widgets (iOS WidgetKit / Android Glance) reading the same JSON document.
-No server, no accounts, no subscriptions needed for any of that.
+The web app is the source of truth. Capacitor wraps it into a native app, and a small WidgetKit
+extension draws a snapshot the web layer writes into a shared App Group. Swift never re-implements
+recurrence or streaks; `js/snapshot.js` precomputes everything the widgets and OS notifications need.
+
+```
+js/snapshot.js                 today's habits, upcoming events, refresh times, notification list
+js/native.js                   bridge: no-op on the web, talks to Capacitor in the app
+ios/App/App/SharedStorePlugin.swift   save snapshot → App Group, reload widgets; read widget taps
+ios/App/App/MainViewController.swift  registers the plugin
+ios/Shared/                    SharedStore.swift + Snapshot.swift (add to BOTH targets)
+ios/DaybookWidget/             the widget extension: bundle, timeline provider, views, intents
+```
+
+What you get: widgets in small / medium / large (iPhone and iPad) and extra large (iPad),
+lock-screen circular / rectangular / inline widgets showing habit progress and the next event,
+tap-to-tick habits and events from the widget on iOS 17+, deep links into the right tab, and
+notifications scheduled by iOS that fire with the app closed.
+
+### One-time setup on a Mac
+
+Needs Xcode 15+, CocoaPods (`brew install cocoapods`) and Node 20+.
+
+1. `npm install && npm run ios:sync` (copies the site into `www/` and syncs it into `ios/App/App/public`).
+2. `cd ios/App && pod install`, then `npm run ios:open` (opens `App.xcworkspace`).
+3. **App target**: drag `ios/App/App/SharedStorePlugin.swift`, `MainViewController.swift` and both
+   files in `ios/Shared/` into the App group in Xcode (tick "App" as target). Under Signing &
+   Capabilities pick your team, add **App Groups** and enable `group.com.daybook.app`
+   (`App.entitlements` is already wired in). Add **Push Notifications** is not needed; local
+   notifications work without it.
+4. **Widget target**: File → New → Target → Widget Extension, name `DaybookWidget`, untick
+   "Include Configuration App Intent". Delete the Swift files Xcode generated, then drag in every
+   file from `ios/DaybookWidget/` and both files from `ios/Shared/` (tick "DaybookWidget" as
+   target). Add the same App Group to this target (`DaybookWidget.entitlements` is provided).
+5. Change `com.daybook.app` to your own bundle id in `capacitor.config.json`, both entitlements
+   files, `ios/Shared/SharedStore.swift` (`appGroup`) and the Xcode signing pane. The App Group id
+   must be `group.` + your bundle id on both targets.
+6. Run on a device or simulator, open Daybook once so it writes the first snapshot, then add the
+   widget from the home screen or lock screen gallery.
+
+Day to day: edit the web files, `npm run ios:sync`, build in Xcode. A free Apple ID installs on your
+own devices for 7 days; the paid developer program is needed for TestFlight and the App Store.
+
+### How the pieces talk
+
+- On every change the web store calls `native.onStateChanged`, which builds the snapshot, hands it
+  to `SharedStore.save`, and replaces the pending local notifications (iOS allows 64; the nearest
+  60 are scheduled and topped up on each launch).
+- The widget's `Provider` reads the snapshot and builds one timeline entry per refresh moment
+  (midnight, each event time), so it updates without the app running.
+- A tap in a widget runs an App Intent that queues a toggle in the App Group and flips the stored
+  snapshot immediately. When the app next opens or resumes, `native.applyPending` replays the queue
+  through the normal store update.
+- Android later: the same snapshot feeds a Jetpack Glance widget and `WallpaperManager` can set the
+  generated wallpaper automatically.
 
 ## Other reminder ideas
 

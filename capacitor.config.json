@@ -1,0 +1,15 @@
+{
+  "appId": "com.daybook.app",
+  "appName": "Daybook",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "always",
+    "backgroundColor": "#ffffff"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon",
+      "iconColor": "#1a73e8"
+    }
+  }
+}

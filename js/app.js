@@ -8,6 +8,7 @@ import { habitsForDay, isDone, isScheduled, streak, completion, dayProgress } fr
 import * as reminders from './reminders.js';
 import { downloadICS } from './ics.js';
 import * as wallpaper from './wallpaper.js';
+import * as native from './native.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -282,13 +283,21 @@ function saveEvent(form) {
   $('#event-dialog').close(); toast(ui.editingEventId ? 'Event updated' : 'Event added');
 }
 
+/** Shared by the UI and by taps made inside native widgets (see native.js). */
+function applyToggle(type, id, key) {
+  update((s) => {
+    if (type === 'habit') { s.habitLog[key] = s.habitLog[key] || {}; if (s.habitLog[key][id]) delete s.habitLog[key][id]; else s.habitLog[key][id] = true; if (!Object.keys(s.habitLog[key]).length) delete s.habitLog[key]; }
+    else if (type === 'event') { const ev = s.events.find((x) => x.id === id); if (!ev) return; ev.completed = ev.completed || {}; if (ev.completed[key]) delete ev.completed[key]; else ev.completed[key] = true; }
+  });
+}
+
 /* ── Actions ── */
 const actions = {
   fab: () => (ui.view === 'habits' ? openHabitDialog() : openEventDialog()),
   'day-shift': (el) => { ui.viewDate = addDays(ui.viewDate, Number(el.dataset.n)); renderAll(); },
   'day-today': () => { ui.viewDate = todayKey(); renderAll(); },
-  'toggle-habit': (el) => update((s) => { const k = el.dataset.key; s.habitLog[k] = s.habitLog[k] || {}; if (s.habitLog[k][el.dataset.id]) delete s.habitLog[k][el.dataset.id]; else s.habitLog[k][el.dataset.id] = true; if (!Object.keys(s.habitLog[k]).length) delete s.habitLog[k]; }),
-  'toggle-occurrence': (el) => update((s) => { const ev = s.events.find((x) => x.id === el.dataset.id); if (!ev) return; ev.completed = ev.completed || {}; if (ev.completed[el.dataset.key]) delete ev.completed[el.dataset.key]; else ev.completed[el.dataset.key] = true; }),
+  'toggle-habit': (el) => applyToggle('habit', el.dataset.id, el.dataset.key),
+  'toggle-occurrence': (el) => applyToggle('event', el.dataset.id, el.dataset.key),
   'skip-occurrence': (el) => { update((s) => { const ev = s.events.find((x) => x.id === el.dataset.id); if (ev) { ev.skipped = ev.skipped || {}; ev.skipped[el.dataset.key] = true; } }); toast('Skipped'); },
   'set-mood': (el) => update((s) => { const j = (s.journal[el.dataset.key] = s.journal[el.dataset.key] || { text: '' }); j.mood = j.mood === Number(el.dataset.mood) ? null : Number(el.dataset.mood); j.updatedAt = new Date().toISOString(); }),
   'new-habit': () => openHabitDialog(),
@@ -349,6 +358,15 @@ function init() {
   ['#ev-allday', '#ev-repeat', '#ev-push'].forEach((s) => $(s).addEventListener('change', syncEventForm));
   $('#ev-date').addEventListener('change', () => { if (!$$('#ev-weekdays input:checked').length) { const b = $(`#ev-weekdays input[value="${weekday($('#ev-date').value || todayKey())}"]`); if (b) b.checked = true; } });
   subscribe(renderAll);
+  // Native shell (Capacitor): mirror a snapshot to the widget App Group, schedule OS notifications,
+  // and pull in taps made inside widgets while the app was closed. All no-ops on the plain web.
+  subscribe(native.onStateChanged);
+  if (native.isNative()) {
+    const pullPending = () => native.applyPending(applyToggle).then((n) => { if (!n) native.sync(getState()); });
+    pullPending();
+    native.onResume(pullPending);
+    native.onDeepLink(setView);
+  }
   window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); ui.installPrompt = e; if (ui.view === 'reminders') renderAll(); });
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed', err));
   reminders.startScheduler({
