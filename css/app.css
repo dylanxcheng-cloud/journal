@@ -1,0 +1,172 @@
+/* Daybook — Google Calendar schedule view × Notes. One blue accent, thin dividers, colored chips, paper cards. */
+:root {
+  --bg: #ffffff; --surface: #ffffff; --paper: #fffdf5; --text: #3c4043; --strong: #202124; --muted: #70757a;
+  --line: #dadce0; --hover: #f1f3f4; --blue: #1a73e8; --blue-soft: #e8f0fe; --on-blue: #ffffff; --done: #1e8e3e; --danger: #d93025;
+  --shadow: 0 1px 3px rgba(60,64,67,.2), 0 2px 8px rgba(60,64,67,.12);
+  color-scheme: light;
+}
+:root[data-theme='dark'] { --bg: #1f1f1f; --surface: #1f1f1f; --paper: #2a2a26; --text: #e8eaed; --strong: #ffffff; --muted: #9aa0a6; --line: #3c4043; --hover: #2d2e30; --blue: #8ab4f8; --blue-soft: #394457; --on-blue: #202124; --done: #81c995; --danger: #f28b82; --shadow: 0 1px 3px rgba(0,0,0,.5); color-scheme: dark; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) { --bg: #1f1f1f; --surface: #1f1f1f; --paper: #2a2a26; --text: #e8eaed; --strong: #ffffff; --muted: #9aa0a6; --line: #3c4043; --hover: #2d2e30; --blue: #8ab4f8; --blue-soft: #394457; --on-blue: #202124; --done: #81c995; --danger: #f28b82; --shadow: 0 1px 3px rgba(0,0,0,.5); color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font: 14px/1.5 Roboto, "Google Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--blue); }
+[hidden] { display: none !important; }
+
+/* Top app bar */
+.topbar { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.topbar .inner { max-width: 760px; margin: 0 auto; height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 12px; }
+.topbar .brand { font-family: "Google Sans", Roboto, sans-serif; font-size: 20px; color: var(--muted); font-weight: 400; padding-right: 4px; }
+.topbar .title { font-size: 20px; color: var(--strong); font-weight: 400; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar .title small { color: var(--muted); font-size: 14px; margin-left: 8px; }
+.icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 0; background: transparent; display: grid; place-items: center; cursor: pointer; color: var(--text); flex: none; }
+.icon-btn:hover { background: var(--hover); }
+.icon-btn svg { width: 22px; height: 22px; fill: currentColor; }
+.outline-btn { border: 1px solid var(--line); background: transparent; border-radius: 4px; padding: 0 14px; height: 36px; cursor: pointer; font-weight: 500; color: var(--text); }
+.outline-btn:hover { background: var(--hover); }
+
+.app { max-width: 760px; margin: 0 auto; padding: 0 12px; }
+.view { display: none; } .view.active { display: block; }
+
+/* Buttons */
+.btn { border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 4px; padding: 0 16px; height: 36px; cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; }
+.btn:hover { background: var(--hover); }
+.btn.primary { background: var(--blue); color: var(--on-blue); border-color: transparent; }
+.btn.text { border: 0; color: var(--blue); padding: 0 8px; }
+.btn.danger { color: var(--danger); }
+.btn.block { width: 100%; justify-content: center; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row.between { justify-content: space-between; }
+.muted { color: var(--muted); } .small { font-size: 12px; }
+
+/* FAB */
+.fab { position: fixed; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; border-radius: 16px; border: 0; background: var(--surface); box-shadow: var(--shadow); cursor: pointer; display: grid; place-items: center; z-index: 6; }
+.fab svg { width: 36px; height: 36px; }
+.fab:hover { box-shadow: 0 2px 6px rgba(60,64,67,.3), 0 4px 12px rgba(60,64,67,.15); }
+
+/* ── Schedule (Google Calendar "Schedule" view) ── */
+.schedule { margin-top: 8px; }
+.day-row { display: grid; grid-template-columns: 64px 1fr; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.day-row:last-child { border-bottom: 0; }
+.day-col { text-align: center; padding-top: 2px; }
+.day-col .wd { font-size: 11px; font-weight: 500; letter-spacing: .8px; color: var(--muted); text-transform: uppercase; }
+.day-col .num { width: 40px; height: 40px; margin: 0 auto; display: grid; place-items: center; border-radius: 50%; font-size: 22px; color: var(--strong); }
+.day-col.today .wd { color: var(--blue); }
+.day-col.today .num { background: var(--blue); color: var(--on-blue); }
+.day-col .rel { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.chips { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.chip { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 6px 10px 6px 8px; border-radius: 6px; color: #fff; background: var(--c, var(--blue)); cursor: pointer; min-width: 0; }
+.chip:hover { filter: brightness(.95); }
+.chip .tick { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(255,255,255,.85); flex: none; display: grid; place-items: center; }
+.chip .tick svg { width: 11px; height: 11px; stroke: var(--c, var(--blue)); stroke-width: 3.5; fill: none; display: none; }
+.chip.done { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.chip.done .tick { background: var(--c, var(--blue)); border-color: var(--c, var(--blue)); }
+.chip.done .tick svg { display: block; stroke: #fff; }
+.chip.done .t { text-decoration: line-through; }
+.chip .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.chip .t small { font-weight: 400; opacity: .85; }
+.chip .time { font-size: 12px; opacity: .9; flex: none; }
+.chip .more { flex: none; opacity: .8; background: transparent; border: 0; color: inherit; padding: 0 4px; cursor: pointer; font-size: 12px; }
+.chip .more:hover { opacity: 1; text-decoration: underline; }
+.chips .none { color: var(--muted); padding: 8px 0; }
+
+/* ── Notes-style cards ── */
+.note { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin: 14px 0; }
+.note.paper { background: var(--paper); }
+.note h2 { margin: 0 0 6px; font-size: 16px; font-weight: 500; color: var(--strong); display: flex; justify-content: space-between; align-items: baseline; }
+.note h2 .meta { font-size: 12px; font-weight: 400; color: var(--muted); }
+.note .stamp { font-size: 12px; color: var(--muted); text-align: center; margin-bottom: 8px; }
+textarea.journal { width: 100%; min-height: 140px; border: 0; background: transparent; resize: vertical; outline: none; font-size: 15px; line-height: 1.6; padding: 0; }
+.save-state { color: var(--muted); font-size: 12px; text-align: right; min-height: 1em; }
+.moods { display: flex; gap: 4px; margin: 4px 0 8px; }
+.mood { width: 34px; height: 34px; border-radius: 50%; border: 0; background: transparent; cursor: pointer; font-size: 18px; opacity: .55; }
+.mood:hover { background: var(--hover); } .mood.selected { opacity: 1; background: var(--blue-soft); }
+
+/* Checklists (Keep style) */
+ul.checklist { list-style: none; margin: 0; padding: 0; }
+.ck { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.ck:first-child { border-top: 0; }
+.ck .box { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--muted); flex: none; cursor: pointer; display: grid; place-items: center; }
+.ck .box svg { width: 12px; height: 12px; stroke: #fff; stroke-width: 3; fill: none; display: none; }
+.ck.done .box { background: var(--c, var(--done)); border-color: var(--c, var(--done)); }
+.ck.done .box svg { display: block; }
+.ck.done .name { color: var(--muted); text-decoration: line-through; }
+.ck .body { flex: 1; min-width: 0; }
+.ck .name { color: var(--strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ck .sub { font-size: 12px; color: var(--muted); }
+.ck .side { flex: none; font-size: 12px; color: var(--muted); }
+.ck .color { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.dots { display: flex; gap: 6px; }
+.dot { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--line); cursor: pointer; }
+.dot.done { background: var(--c, var(--done)); border-color: var(--c, var(--done)); }
+.dot.off { opacity: .25; cursor: default; }
+.dot.today { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--blue); }
+.streak { color: #e8710a; }
+.empty { color: var(--muted); padding: 16px 0; }
+.empty a { cursor: pointer; }
+
+/* Section headers */
+.sec { display: flex; justify-content: space-between; align-items: baseline; margin: 22px 0 4px; }
+.sec h2 { margin: 0; font-size: 12px; font-weight: 500; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
+.tabs { display: flex; gap: 4px; margin: 10px 0 0; border-bottom: 1px solid var(--line); }
+.tabs button { border: 0; background: transparent; padding: 10px 14px; color: var(--muted); cursor: pointer; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs button.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+/* Forms (Google Calendar event editor) */
+dialog { border: 0; border-radius: 12px; padding: 0; background: var(--surface); color: var(--text); width: min(520px, calc(100vw - 24px)); max-height: calc(100vh - 24px); box-shadow: var(--shadow); }
+dialog::backdrop { background: rgba(0,0,0,.4); }
+dialog form { padding: 8px 20px 16px; }
+.dlg-head { display: flex; justify-content: flex-end; }
+input.title-input { width: 100%; border: 0; border-bottom: 1px solid var(--line); font-size: 22px; padding: 8px 0; background: transparent; outline: none; color: var(--strong); }
+input.title-input:focus { border-bottom: 2px solid var(--blue); }
+.frow { display: grid; grid-template-columns: 32px 1fr; gap: 12px; align-items: center; padding: 8px 0; }
+.frow .ic { color: var(--muted); display: grid; place-items: center; } .frow .ic svg { width: 20px; height: 20px; fill: currentColor; }
+.frow .in { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; min-width: 0; }
+.frow input:not([type=checkbox]), .frow select, .frow textarea { border: 0; background: var(--hover); border-radius: 4px; padding: 8px 10px; min-height: 36px; }
+.frow input[type=text] { flex: 1; min-width: 120px; } .frow textarea { width: 100%; min-height: 60px; resize: vertical; }
+.frow label.sw { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.frow input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--blue); }
+.weekdays { display: flex; gap: 6px; }
+.weekdays label { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; cursor: pointer; font-size: 12px; }
+.weekdays input { display: none; }
+.weekdays label:has(input:checked) { background: var(--blue); color: var(--on-blue); border-color: var(--blue); }
+.swatches { display: flex; gap: 8px; }
+.swatches label { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; display: grid; place-items: center; }
+.swatches input { display: none; }
+.swatches label:has(input:checked)::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+.dialog-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+.dialog-actions .right { display: flex; gap: 8px; margin-left: auto; }
+
+/* Remind view */
+.setting { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.setting:first-of-type { border-top: 0; }
+.setting .l { color: var(--strong); } .setting .s { font-size: 12px; color: var(--muted); }
+.setting input[type=time], .setting select { border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; background: transparent; }
+.setting input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--blue); }
+.banner { display: flex; gap: 10px; padding: 12px; border-radius: 8px; background: var(--blue-soft); color: var(--strong); font-size: 13px; }
+.banner.warn { background: #fef7e0; } :root[data-theme='dark'] .banner.warn { background: #3a3325; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .banner.warn { background: #3a3325; } }
+.wp-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+@media (min-width: 560px) { .wp-grid { grid-template-columns: 1fr 200px; align-items: start; } }
+.wp-preview canvas { width: 100%; max-width: 200px; height: auto; border-radius: 18px; border: 4px solid var(--strong); display: block; margin: 0 auto; }
+.widget-frame { width: 100%; height: 320px; border: 1px solid var(--line); border-radius: 12px; }
+ol.steps { padding-left: 18px; margin: 6px 0; font-size: 13px; color: var(--muted); } ol.steps li { margin: 3px 0; }
+
+/* Bottom nav (Google apps style) */
+.nav { position: fixed; left: 0; right: 0; bottom: 0; background: var(--bg); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); z-index: 5; }
+.nav .inner { max-width: 760px; margin: 0 auto; display: flex; }
+.nav button { flex: 1; border: 0; background: transparent; color: var(--muted); padding: 8px 0 10px; cursor: pointer; font-size: 12px; font-weight: 500; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.nav button .pill { width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; }
+.nav button svg { width: 22px; height: 22px; fill: currentColor; }
+.nav button.active { color: var(--strong); } .nav button.active .pill { background: var(--blue-soft); }
+
+.toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); background: #323232; color: #fff; padding: 12px 18px; border-radius: 4px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; box-shadow: var(--shadow); }
+.toast.show { opacity: 1; }
+@media (max-width: 480px) { .topbar .brand { display: none; } .topbar .title { font-size: 18px; } .topbar .title small { display: none; } }
