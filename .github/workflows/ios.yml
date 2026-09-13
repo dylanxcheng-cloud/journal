@@ -1,0 +1,33 @@
+name: iOS
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync ios
+      - run: cd ios/App && pod install
+      - run: npm run ios:configure
+      - name: Build app + widget for the simulator (unsigned)
+        run: |
+          xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            build | tee xcodebuild.log | grep -E "error:|warning: .*Daybook|BUILD" || true
+          grep -q "BUILD SUCCEEDED" xcodebuild.log
+      - name: Package simulator app
+        run: cd build/Build/Products/Debug-iphonesimulator && zip -qr ../../../../Daybook-simulator.zip App.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Daybook-iOS-simulator
+          path: Daybook-simulator.zip
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: xcodebuild-log
+          path: xcodebuild.log

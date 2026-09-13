@@ -63,29 +63,35 @@ lock-screen circular / rectangular / inline widgets showing habit progress and t
 tap-to-tick habits and events from the widget on iOS 17+, deep links into the right tab, and
 notifications scheduled by iOS that fire with the app closed.
 
-### One-time setup on a Mac
+### Building the apps
 
-Needs Xcode 15+, CocoaPods (`brew install cocoapods`) and Node 20+.
+Every push builds both apps in GitHub Actions (see the **iOS** and **Android** workflows):
 
-1. `npm install && npm run ios:sync` (copies the site into `www/` and syncs it into `ios/App/App/public`).
-2. `cd ios/App && pod install`, then `npm run ios:open` (opens `App.xcworkspace`).
-3. **App target**: drag `ios/App/App/SharedStorePlugin.swift`, `MainViewController.swift` and both
-   files in `ios/Shared/` into the App group in Xcode (tick "App" as target). Under Signing &
-   Capabilities pick your team, add **App Groups** and enable `group.com.daybook.app`
-   (`App.entitlements` is already wired in). Add **Push Notifications** is not needed; local
-   notifications work without it.
-4. **Widget target**: File → New → Target → Widget Extension, name `DaybookWidget`, untick
-   "Include Configuration App Intent". Delete the Swift files Xcode generated, then drag in every
-   file from `ios/DaybookWidget/` and both files from `ios/Shared/` (tick "DaybookWidget" as
-   target). Add the same App Group to this target (`DaybookWidget.entitlements` is provided).
-5. Change `com.daybook.app` to your own bundle id in `capacitor.config.json`, both entitlements
-   files, `ios/Shared/SharedStore.swift` (`appGroup`) and the Xcode signing pane. The App Group id
-   must be `group.` + your bundle id on both targets.
-6. Run on a device or simulator, open Daybook once so it writes the first snapshot, then add the
-   widget from the home screen or lock screen gallery.
+- **Android:** the workflow uploads `Daybook-android-debug-apk`. Download it from the run, copy it
+  to a phone and open it (allow installs from unknown sources). No accounts needed.
+- **iOS:** the workflow compiles the app **and the widget extension** on a macOS runner and uploads
+  a simulator build. Installing on a real iPhone needs Apple code signing, which means a Mac with
+  Xcode once, or signing secrets in CI (Apple Developer Program, US$99/year, for TestFlight and the
+  App Store; a free Apple ID can install on your own devices for 7 days from Xcode).
 
-Day to day: edit the web files, `npm run ios:sync`, build in Xcode. A free Apple ID installs on your
-own devices for 7 days; the paid developer program is needed for TestFlight and the App Store.
+On a Mac (Xcode 15+, CocoaPods, Node 20+):
+
+```
+npm install
+npm run ios:sync        # copies the site, syncs Capacitor, then runs tools/ios-configure.rb
+cd ios/App && pod install && cd ../..
+npm run ios:open        # opens the workspace; pick your team under Signing & Capabilities, then Run
+```
+
+`tools/ios-configure.rb` does the Xcode wiring for you: adds the plugin and shared files to the App
+target, creates the `DaybookWidget` extension target with its sources, Info.plist and entitlements,
+links WidgetKit and SwiftUI, embeds the extension, and sets iOS 17 as the minimum. It is idempotent.
+The only manual steps are choosing your signing team and, if you change the bundle id, updating
+`com.daybook.app` in `capacitor.config.json`, both `.entitlements` files and
+`ios/Shared/SharedStore.swift` (the App Group must be `group.` + bundle id).
+
+Android: `npm run android:apk` builds `android/app/build/outputs/apk/debug/app-debug.apk` locally
+(needs Java 21 and the Android SDK, or just use the workflow).
 
 ### How the pieces talk
 
@@ -97,8 +103,8 @@ own devices for 7 days; the paid developer program is needed for TestFlight and 
 - A tap in a widget runs an App Intent that queues a toggle in the App Group and flips the stored
   snapshot immediately. When the app next opens or resumes, `native.applyPending` replays the queue
   through the normal store update.
-- Android later: the same snapshot feeds a Jetpack Glance widget and `WallpaperManager` can set the
-  generated wallpaper automatically.
+- Android: the app builds and runs today; a Jetpack Glance widget fed by the same snapshot, and
+  automatic wallpaper via `WallpaperManager`, are the next native pieces.
 
 ## Other reminder ideas
 

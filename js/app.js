@@ -136,13 +136,17 @@ function renderEvents(state) {
 
 /* ── Reminders ── */
 function renderReminders(state) {
-  const perm = reminders.permissionState();
+  const perm = native.isNative() ? ui.nativePerm || 'prompt' : reminders.permissionState();
+  const onNative = native.isNative();
   const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   const wp = state.settings.wallpaper, hr = state.settings.habitReminder;
   const widgetUrl = new URL('widget.html', location.href).href;
   let banner;
-  if (perm === 'granted') banner = `<div class="banner">🔔 Notifications are on. They fire while Daybook is open (tab or installed app). For alerts when it's closed, use <b>.ics</b> on an event to put it in your phone's calendar.</div>`;
+  if (onNative && perm === 'granted') banner = `<div class="banner">🔔 Notifications are on. Reminders are scheduled with the system and fire even when Daybook is closed.</div>`;
+  else if (onNative && perm === 'denied') banner = `<div class="banner warn">Notifications are off for Daybook. Turn them on in Settings → Notifications → Daybook.</div>`;
+  else if (onNative) banner = `<div class="banner warn">Allow notifications to get an alert before events.</div>`;
+  else if (perm === 'granted') banner = `<div class="banner">🔔 Notifications are on. They fire while Daybook is open (tab or installed app). For alerts when it's closed, use <b>.ics</b> on an event to put it in your phone's calendar.</div>`;
   else if (perm === 'denied') banner = `<div class="banner warn">Notifications are blocked for this site. Allow them in browser settings, then reload.</div>`;
   else if (perm === 'unsupported') banner = `<div class="banner warn">This browser can't show notifications.${isIOS ? ' On iPhone: Share → Add to Home Screen, then open Daybook from there.' : ''}</div>`;
   else banner = `<div class="banner warn">Turn on notifications to get an alert before events.${isIOS && !standalone ? ' iPhone: add to Home Screen first.' : ''}</div>`;
@@ -150,7 +154,7 @@ function renderReminders(state) {
   $('[data-view="reminders"]').innerHTML = `
     <div class="sec"><h2>Notifications</h2></div>
     ${banner}
-    <div class="row" style="margin:10px 0">${perm === 'default' ? '<button class="btn primary" data-action="enable-notifications">Turn on</button>' : ''}${perm === 'granted' ? '<button class="btn" data-action="test-notification">Send a test</button>' : ''}</div>
+    <div class="row" style="margin:10px 0">${perm === 'default' || (onNative && perm === 'prompt') ? '<button class="btn primary" data-action="enable-notifications">Turn on</button>' : ''}${perm === 'granted' && !onNative ? '<button class="btn" data-action="test-notification">Send a test</button>' : ''}</div>
     <div class="setting"><div><div class="l">Daily habit reminder</div><div class="s">One nudge listing what's left</div></div><div class="row"><input type="time" value="${esc(hr.time)}" data-change="habit-time"><input type="checkbox" ${hr.enabled ? 'checked' : ''} data-change="habit-toggle"></div></div>
     <div class="setting"><div><div class="l">All-day events remind at</div></div><input type="time" value="${esc(state.settings.allDayReminderTime)}" data-change="allday-time"></div>
 
@@ -161,21 +165,26 @@ function renderReminders(state) {
         <div class="setting"><div class="l">Phone</div><select data-change="wp-preset">${wallpaper.PRESETS.map((p) => `<option value="${p.id}" ${wp.preset === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>
         <div class="setting"><div class="l">Style</div><select data-change="wp-theme">${wallpaper.THEME_IDS.map((t) => `<option value="${t}" ${wp.theme === t ? 'selected' : ''}>${t[0].toUpperCase() + t.slice(1)}</option>`).join('')}</select></div>
         <div class="setting"><div class="l">Show events for</div><select data-change="wp-days">${[1, 3, 7, 14].map((d) => `<option value="${d}" ${Number(wp.days) === d ? 'selected' : ''}>${d === 1 ? 'today' : d + ' days'}</option>`).join('')}</select></div>
-        <button class="btn primary block" style="margin-top:12px" data-action="wp-download">Download wallpaper</button>
-        <ol class="steps"><li><b>iPhone:</b> Photos → Share → Use as Wallpaper → Lock Screen.</li><li><b>Android:</b> open image → ⋮ → Use as → Lock screen.</li></ol>
+        <button class="btn primary block" style="margin-top:12px" data-action="wp-download">${onNative ? 'Save to Photos' : 'Download wallpaper'}</button>
+        ${onNative && native.platform() === 'ios' ? '<ol class="steps"><li>Tap <b>Save Image</b> in the share sheet.</li><li>Photos → Share → Use as Wallpaper → Lock Screen.</li><li>Or skip the image: add the <b>Daybook</b> lock-screen widget instead (long-press the lock screen → Customize).</li></ol>' : ''}
+        ${onNative && native.platform() === 'android' ? '<ol class="steps"><li>Share → Save, then open the image → ⋮ → Use as → Lock screen.</li></ol>' : ''}
+        ${!onNative ? '<ol class="steps"><li><b>iPhone:</b> Photos → Share → Use as Wallpaper → Lock Screen.</li><li><b>Android:</b> open image → ⋮ → Use as → Lock screen.</li></ol>' : ''}
       </div>
       <div class="wp-preview"><canvas id="wp-canvas" aria-label="Wallpaper preview"></canvas></div>
     </div>
 
     <div class="sec"><h2>Widget</h2></div>
-    <p class="small muted" style="margin:0 0 10px">A live, one-glance page. Add it to your home screen as its own icon; ticking a habit there updates the app.</p>
+    ${onNative ? `<p class="small muted" style="margin:0 0 6px">Daybook ships home-screen and lock-screen widgets. Ticking a habit in a widget updates the app.</p>
+    <ol class="steps"><li><b>Home screen:</b> long-press an empty spot → <b>+</b> (or Edit → Add Widget) → search "Daybook" → pick small, medium or large${native.platform() === 'ios' ? ' (extra large on iPad)' : ''}.</li>
+    ${native.platform() === 'ios' ? '<li><b>Lock screen:</b> long-press the lock screen → Customize → Lock Screen → tap the widget area → Daybook.</li>' : ''}</ol>`
+    : `<p class="small muted" style="margin:0 0 10px">A live, one-glance page. Add it to your home screen as its own icon; ticking a habit there updates the app.</p>
     <iframe class="widget-frame" src="${esc(widgetUrl)}" title="Widget preview"></iframe>
     <div class="row" style="margin-top:10px"><a class="btn" href="${esc(widgetUrl)}" target="_blank" rel="noopener">Open widget</a></div>
-    <ol class="steps"><li>Open the widget page, then <b>Share → Add to Home Screen</b> (iPhone) or <b>⋮ → Add to Home screen</b> (Android).</li></ol>
+    <ol class="steps"><li>Open the widget page, then <b>Share → Add to Home Screen</b> (iPhone) or <b>⋮ → Add to Home screen</b> (Android).</li></ol>`}
 
     <div class="sec"><h2>App</h2></div>
     <div class="setting"><div class="l">Theme</div><select data-change="theme">${['system', 'light', 'dark'].map((t) => `<option value="${t}" ${state.settings.theme === t ? 'selected' : ''}>${t[0].toUpperCase() + t.slice(1)}</option>`).join('')}</select></div>
-    <div class="setting"><div><div class="l">Install</div><div class="s">${standalone ? 'Installed' : ui.installPrompt ? 'Works offline, opens like an app' : 'iPhone: Share → Add to Home Screen. Android/desktop: Install from the browser menu.'}</div></div>${ui.installPrompt ? '<button class="btn" data-action="install">Install</button>' : ''}</div>
+    ${onNative ? '' : `<div class="setting"><div><div class="l">Install</div><div class="s">${standalone ? 'Installed' : ui.installPrompt ? 'Works offline, opens like an app' : 'iPhone: Share → Add to Home Screen. Android/desktop: Install from the browser menu.'}</div></div>${ui.installPrompt ? '<button class="btn" data-action="install">Install</button>' : ''}</div>`}
     <div class="setting"><div><div class="l">Your data</div><div class="s">Stored on this device only. ${state.habits.length} habits · ${state.events.length} events · ${Object.values(state.journal).filter((j) => j.text).length} journal entries</div></div>
       <div class="row"><button class="btn" data-action="export">Export</button><label class="btn">Import<input type="file" accept=".json,application/json" hidden data-change="import"></label></div></div>
     <div class="setting"><div class="l">Erase everything</div><button class="btn danger" data-action="reset">Erase</button></div>
@@ -207,6 +216,7 @@ function renderAll() {
 }
 function setView(view) {
   ui.view = VIEWS.includes(view) ? view : 'today';
+  if (ui.view === 'reminders' && native.isNative()) native.notificationPermission().then((p) => { ui.nativePerm = p; renderAll(); });
   if (location.hash.replace(/^#/, '').split('?')[0] !== ui.view) history.replaceState(null, '', `#${ui.view}`);
   renderAll(); window.scrollTo({ top: 0 });
 }
@@ -312,9 +322,13 @@ const actions = {
   'event-delete': () => { if (!ui.editingEventId || !confirm('Delete this event?')) return; update((s) => { s.events = s.events.filter((x) => x.id !== ui.editingEventId); }); $('#event-dialog').close(); toast('Event deleted'); },
   seg: (el) => { ui.seg = el.dataset.seg; renderAll(); },
   ics: (el) => { const ev = getState().events.find((x) => x.id === el.dataset.id); if (ev) { downloadICS(ev); toast('Calendar file downloaded'); } },
-  'enable-notifications': async () => { const r = await reminders.requestPermission(); renderAll(); if (r === 'granted') { reminders.notify('Daybook', { body: 'Notifications are on.' }); } else toast('Not allowed'); },
+  'enable-notifications': async () => {
+    if (native.isNative()) { ui.nativePerm = await native.requestNotificationPermission(); if (ui.nativePerm === 'granted') native.sync(getState()); renderAll(); return; }
+    const r = await reminders.requestPermission(); renderAll(); if (r === 'granted') { reminders.notify('Daybook', { body: 'Notifications are on.' }); } else toast('Not allowed'); },
   'test-notification': async () => toast((await reminders.notify('Test reminder', { body: 'This is what an event alert looks like.', tag: 'test' })) ? 'Sent' : 'Could not show'),
-  'wp-download': () => { const c = $('#wp-canvas'); if (c) { wallpaper.render(c, getState(), getState().settings.wallpaper); wallpaper.download(c); toast('Downloaded'); } },
+  'wp-download': async () => { const c = $('#wp-canvas'); if (!c) return; wallpaper.render(c, getState(), getState().settings.wallpaper);
+    if (native.isNative()) { try { await native.shareCanvas(c, `daybook-${todayKey()}.png`); } catch (e) { toast('Could not share'); } return; }
+    wallpaper.download(c); toast('Downloaded'); },
   install: async () => { if (!ui.installPrompt) return; ui.installPrompt.prompt(); await ui.installPrompt.userChoice.catch(() => {}); ui.installPrompt = null; renderAll(); },
   export: () => { const url = URL.createObjectURL(new Blob([exportJSON()], { type: 'application/json' })); const a = Object.assign(document.createElement('a'), { href: url, download: `daybook-${todayKey()}.json` }); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); },
   reset: () => { if (confirm('Erase all habits, events and journal entries on this device?')) { resetAll(); toast('Erased'); } },

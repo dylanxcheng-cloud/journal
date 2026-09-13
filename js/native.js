@@ -13,15 +13,17 @@ import { todayKey } from './dates.js';
 const cap = () => (typeof window !== 'undefined' && window.Capacitor) || null;
 export const isNative = () => Boolean(cap() && cap().isNativePlatform && cap().isNativePlatform());
 
-let sharedStore = null;
-function plugin() {
+const registry = {};
+function reg(name) {
   if (!isNative()) return null;
-  if (!sharedStore) {
-    try { sharedStore = cap().registerPlugin('SharedStore'); } catch { sharedStore = null; }
+  if (!registry[name]) {
+    try { registry[name] = cap().registerPlugin(name); } catch { registry[name] = null; }
   }
-  return sharedStore;
+  return registry[name];
 }
-const localNotifications = () => (isNative() && cap().Plugins && cap().Plugins.LocalNotifications) || null;
+const plugin = () => reg('SharedStore');
+const localNotifications = () => reg('LocalNotifications');
+export const platform = () => (isNative() ? cap().getPlatform() : 'web');
 
 let timer = null;
 /** Debounced: called from the store subscription on every change. */
@@ -81,14 +83,37 @@ export async function applyPending(applyToggle) {
 export function onResume(fn) {
   if (!isNative()) return;
   document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && fn());
-  try { cap().Plugins.App && cap().Plugins.App.addListener('appStateChange', ({ isActive }) => isActive && fn()); } catch { /* optional */ }
+  try { const app = reg('App'); app && app.addListener('appStateChange', ({ isActive }) => isActive && fn()); } catch { /* optional */ }
+}
+
+/** 'granted' | 'denied' | 'prompt' from the OS (not the browser's Notification API, which WKWebView lacks). */
+export async function notificationPermission() {
+  const ln = localNotifications();
+  if (!ln) return 'prompt';
+  try { return (await ln.checkPermissions()).display; } catch { return 'prompt'; }
+}
+export async function requestNotificationPermission() {
+  const ln = localNotifications();
+  if (!ln) return 'denied';
+  try { return (await ln.requestPermissions()).display; } catch { return 'denied'; }
+}
+
+/** Hand a rendered canvas to the OS share sheet (iOS: "Save Image" puts it in Photos). */
+export async function shareCanvas(canvas, filename) {
+  const fs = reg('Filesystem'), share = reg('Share');
+  if (!fs || !share) return false;
+  const dataUrl = canvas.toDataURL('image/png');
+  const { uri } = await fs.writeFile({ path: filename, data: dataUrl.split(',')[1], directory: 'CACHE' });
+  await share.share({ title: 'Daybook wallpaper', files: [uri] });
+  return true;
 }
 
 /** Widgets open the app with daybook://<view>; route it to the matching tab. */
 export function onDeepLink(fn) {
   if (!isNative()) return;
   try {
-    cap().Plugins.App && cap().Plugins.App.addListener('appUrlOpen', ({ url }) => {
+    const app = reg('App');
+    app && app.addListener('appUrlOpen', ({ url }) => {
       const m = /^daybook:\/\/([a-z]+)/i.exec(url || '');
       if (m) fn(m[1].toLowerCase());
     });

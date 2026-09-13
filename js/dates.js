@@ -16,8 +16,8 @@ export function fromKey(key) {
   return new Date(y, m - 1, d);
 }
 
-export function todayKey() {
-  return toKey(new Date());
+export function todayKey(d = new Date()) {
+  return toKey(d);
 }
 
 export function addDays(key, n) {
